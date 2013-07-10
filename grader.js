@@ -24,8 +24,10 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "http://fierce-reaches-1073.herokuapp.com";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -61,14 +63,36 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var buildfn = function(htmlfile) {
+    var response2file = function(result, response) {
+        if (result instanceof Error) {
+            console.error('Error: ' + util.format(response.message));
+        } else {
+            fs.writeFileSync(htmlfile, result);
+	    var checkJson = checkHtmlFile(htmlfile, program.checks);
+	    var outJson = JSON.stringify(checkJson, null, 4);
+	    console.log(outJson);
+	}
+    }; 
+    return response2file;
+};
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+	.option('-u, --url <url>', 'URL to page', URL_DEFAULT)
+	.parse(process.argv);
+    if (program.url) { 
+	var responsepath = "response.html";
+	var response2file = buildfn(responsepath); 
+	rest.get(program.url).on('complete', response2file);
+    } else  {
+	var checkJson = checkHtmlFile(program.file, program.checks);
+    	var outJson = JSON.stringify(checkJson, null, 4);
+	console.log(outJson);
+    }
+    
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
